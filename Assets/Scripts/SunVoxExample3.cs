@@ -76,7 +76,7 @@ public class SunVoxExample3 : MonoBehaviour {
     }
 
     //Load module and play it:
-    var path = "Assets/StreamingAssets/organ.sunsynth"; // This path is correct only for standalone
+    var path = "Assets/StreamingAssets/keys/piano.sunsynth"; // This path is correct only for standalone
     int mod_num2 = SunVox.sv_load_module (0, path, 0, 0, 0);
     if (mod_num2 >= 0) {
       log ("Module loaded: " + mod_num2);
@@ -110,4 +110,13 @@ public class SunVoxExample3 : MonoBehaviour {
     SunVox.sv_deinit ();
   }
 
+
+  private void OnGUI() {
+    Event e = Event.current;
+    if ( e.type != EventType.Used && e.isKey )
+    {
+      SunVox.sv_send_event (0, 0, e.type == EventType.KeyUp ? 128 : (int)e.keyCode, 128, 3, 0, 0);
+      e.Use();
+    }
+  }
 }

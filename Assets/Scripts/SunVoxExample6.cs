@@ -85,7 +85,7 @@ public class SunVoxExample6 : MonoBehaviour {
 #endif
 
 #if UNITY_STANDALONE || UNITY_EDITOR
-    streamingAssetsPath = Application.dataPath + "/StreamingAssets";
+    streamingAssetsPath = Application.streamingAssetsPath;
 #endif
 
     var path = Path.Combine (streamingAssetsPath, fileName);

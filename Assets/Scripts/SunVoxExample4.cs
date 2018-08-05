@@ -60,7 +60,7 @@ public class SunVoxExample4 : MonoBehaviour {
       SunVox.sv_connect_module (0, mod_num, 0);
       SunVox.sv_unlock_slot (0);
       //Load a sample:
-      var path = "Assets/StreamingAssets/flute.xi"; // This path is correct only for standalone
+      var path = "Assets/StreamingAssets/test.wav"; // This path is correct only for standalone
       SunVox.sv_sampler_load (0, mod_num, path, -1);
       //Send Note ON:
       log ("Note ON");

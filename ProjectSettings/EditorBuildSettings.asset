@@ -5,6 +5,10 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/SunVoxExample5.unity
     guid: 06d5932269dd21a498c83fdef1e7026f
+  - enabled: 1
+    path: Assets/Scenes/Announcement.unity
+    guid: a8e050bd39b684714bf7914bc51f89b8
+  m_configObjects: {}
