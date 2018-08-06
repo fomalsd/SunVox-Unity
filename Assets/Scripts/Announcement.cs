@@ -1,107 +1,178 @@
 ﻿using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.UI;
+using Random = UnityEngine.Random;
+
+public enum Slot {
+	Music = 0,
+	Announce = 1,
+	FX = 2,
+}
 
 public class Announcement : MonoBehaviour {
+	public static Announcement Instance;
+	public Text Text;
+	///sampler module id 5 is hardcoded for demo
+	private readonly int SamplerModule = 5;
 
-  /*
-     You can use SunVox library freely, 
-     but the following text should be included in your products (e.g. in About window):
+	private int FxModule;
 
-     SunVox modular synthesizer
-     Copyright (c) 2008 - 2018, Alexander Zolotov <nightradio@gmail.com>, WarmPlace.ru
+	private void Awake() {
+		if ( Instance == null ) {
+			Instance = this;
+		} //else gets destroyed by parent
+	}
+	void Start() {
+		Init();
+//		MaryTTS.Instance.Announce( "Attention all personnel, we're fucking screwed. " +
+//		                           "Syndicate ship is approaching. " +
+//		                           "Central Command doesn't give a damn, so I guess we're on our own." );
+		FxModule = LoadFxInstrument( "keys/fm1.sunsynth" );
+//		PlayMusic( "a10.xm", 32 );
+	}
 
-     Ogg Vorbis 'Tremor' integer playback codec
-     Copyright (c) 2002, Xiph.org Foundation
-  */
-  public static Announcement Instance;
+	public void Init() {
+		try {
+			int ver = SunVox.sv_init( "0", 11025, 2, 0 );//lo-fi 4ever
+			if ( ver >= 0 ) {
+				int major = ( ver >> 16 ) & 255;
+				int minor1 = ( ver >> 8 ) & 255;
+				int minor2 = ( ver ) & 255;
+				log( String.Format( "SunVox lib version: {0}.{1}.{2}", major, minor1, minor2 ) );
 
-  public Text Text;
+				InitAnnounce();
+				InitMusic();
+				InitFX();
+			} else {
+				log( "sv_init() error " + ver );
+			}
+		} catch ( Exception e ) {
+			log( "Exception: " + e );
+		}
+	}
 
-  void Start ()
-  {
-    MaryTTS.Instance.Announce( "Attention all personnel, we're fucking screwed. " +
-                               "Syndicate ship is approaching. " +
-                               "Central Command doesn't give a damn, so I guess we're on our own." );
-  }
-  
-  private void Awake()
-  {
-    if (Instance == null)
-    {
-      Instance = this;
-    } //else gets destroyed by parent
-  }
+	private void InitAnnounce() {
+		SunVox.sv_open_slot( (int)Slot.Announce );
 
-  public void InitAndPlay( byte[] sound )
-  {
-    try
-    {
-      int ver = SunVox.sv_init( "0", 44100, 2, 0 );
-      if ( ver >= 0 )
-      {
-        int major = ( ver >> 16 ) & 255;
-        int minor1 = ( ver >> 8 ) & 255;
-        int minor2 = ( ver ) & 255;
-        log( String.Format( "SunVox lib version: {0}.{1}.{2}", major, minor1, minor2 ) );
+		log( "Loading Announce project from file..." );
+		var path = "Assets/StreamingAssets/announcement2.sunvox"; //fixme This path is correct only for editor
+		if ( SunVox.sv_load( (int)Slot.Announce, path ) == 0 ) {
+			log( "Loaded." );
+		} else {
+			log( "Load error." );
+			SunVox.sv_volume( (int)Slot.Announce, 256 );
+		}
+	}
 
-        SunVox.sv_open_slot( 0 );
+	private void InitMusic() {
+		SunVox.sv_open_slot( (int)Slot.Music );
+	}
 
-        log( "Loading SunVox project from file..." );
-        var path = "Assets/StreamingAssets/announcement.sunvox"; // This path is correct only for standalone
-        if ( SunVox.sv_load( 0, path ) == 0 )
-        {
-          log( "Loaded." );
-        }
-        else
-        {
-          log( "Load error." );
-          SunVox.sv_volume( 0, 256 );
-        }
+	private void InitFX() {
+		SunVox.sv_open_slot( (int)Slot.FX );
+	}
 
-        //sampler module id 5 is hardcoded for demo
-        SunVox.sv_sampler_load_from_memory(0, 5, sound, sound.Length, -1); 
-        SunVox.sv_set_autostop( 0, 1 );
-        SunVox.sv_play_from_beginning (0); //play announcement tune
-        StartCoroutine( SpeakAnnouncement() );
-      }
-      else
-      {
-        log( "sv_init() error " + ver );
-      }
-    }
-    catch ( Exception e )
-    {
-      log( "Exception: " + e );
-    }
-  }
+	public int LoadFxInstrument( string instrument ) {
+		//Load module and play it:
+		var path = $"Assets/StreamingAssets/{instrument}"; // This path is correct only for standalone
+		int moduleId = SunVox.sv_load_module( (int)Slot.FX, path, 0, 0, 0 );
+		if ( moduleId >= 0 ) {
+			log( "Module loaded: " + moduleId );
+			//Connect the new module to the Main Output:
+			SunVox.sv_lock_slot( (int)Slot.FX );
+			SunVox.sv_connect_module( (int)Slot.FX, moduleId, 0 );
+			SunVox.sv_unlock_slot( (int)Slot.FX );
+		} else {
+			log( "Can't load the module" );
+		}
+		return moduleId;
+	}
 
-  private IEnumerator SpeakAnnouncement() {
-    yield return new WaitForSeconds( 3f );
-//    SunVox.sv_stop (0);
-      //sampler module id 5 is hardcoded for demo
-    SunVox.sv_send_event (0, 0, 60, 128, 5 + 1, 0, 0);
-//    SunVox.sv_send_event (0, 0, 64, 128, mod_num + 1, 0, 0);
+	public void PlayFX( int module ) {
+		StartCoroutine( PlayNote( module ) );
+	}
 
+	private IEnumerator PlayNote( int module ) {
+		SunVox.sv_send_event((int)Slot.FX, 0, Random.Range( 48, 72 ), 128, module + 1, 0, 0);
+		yield return new WaitForSeconds( 0.1f );
+		SunVox.sv_send_event((int)Slot.FX, 0, 128, 128, module + 1, 0, 0);
+	}
 
-    yield break;
-  }
+	public void PlayMusic( string filename, byte volume = Byte.MaxValue ) {
+		var path = $"Assets/StreamingAssets/{filename}"; // This path is correct only for editor
+		log( $"Loading track {filename} from {path}..." );
+		if ( SunVox.sv_load( (int)Slot.Music, path ) == 0 ) {
+			log( "Loaded." );
+			SunVox.sv_stop( (int)Slot.Music );
+			SunVox.sv_set_autostop( (int)Slot.Music, 1 );
+			SunVox.sv_play_from_beginning( (int)Slot.Music );
+		} else {
+			log( "Load error." );
+			SunVox.sv_volume( (int)Slot.Music, volume );
+		}
+	}
+	
+	public void PlayAnnouncement( byte[] sound ) {
+		try {
+			SunVox.sv_stop( (int)Slot.Announce );
+			SunVox.sv_sampler_load_from_memory( (int)Slot.Announce, SamplerModule, sound, sound.Length, -1 );
+			SunVox.sv_set_autostop( (int)Slot.Announce, 1 );
+			SunVox.sv_play_from_beginning( (int)Slot.Announce ); //play announcement tune
+			StartCoroutine( SpeakAnnouncement() );
+		} catch ( Exception e ) {
+			log( "Exception: " + e );
+		}
+	}
+	private IEnumerator SpeakAnnouncement() {
+		yield return new WaitForSeconds( 3f );
+		SunVox.sv_send_event( (int)Slot.Announce, 0, 60, 128, SamplerModule + 1, 0, 0 );
+	}
 
-  private void log (string msg) {
-    Debug.Log (msg);
-    Text.text = Text.text + "\n" + msg;
-  }
+	public void StopMusic() {
+		Stop( Slot.Music );
+	}
 
-  private void OnDestroy () {
-    if (!enabled) return;
+	public void StopAnnouncement() {
+		Stop( Slot.Announce );
+	}
 
-    SunVox.sv_close_slot (0);
-    SunVox.sv_deinit ();
-  }
+	public void StopFX() {
+		Stop( Slot.FX );
+	}
 
+	public void StopAll() {
+		foreach ( Slot slot in Enum.GetValues(typeof(Slot)) ) {
+			Stop( slot );
+		}
+	}
+
+	private void Stop( Slot slot ) {
+		SunVox.sv_stop( (int)slot );
+	}
+
+	private void log( string msg ) {
+		Debug.Log( msg );
+		Text.text = Text.text + "\n" + msg;
+	}
+
+	private void OnDestroy() {
+		if ( !enabled ) {
+			return;
+		}
+
+		foreach ( Slot slot in Enum.GetValues(typeof(Slot)) ) {
+			SunVox.sv_close_slot( (int)slot );
+		}
+		SunVox.sv_deinit();
+	}
+	
+	private void OnGUI() {
+		Event e = Event.current;
+		if ( e.type != EventType.Used && e.isMouse )
+		{
+			PlayFX( FxModule );
+			e.Use();
+		}
+	}
 }

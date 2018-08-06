@@ -56,7 +56,7 @@ public class MaryTTS : MonoBehaviour
             Debug.Log("Err: " + request.error);
         } else
         {
-            Announcement.Instance.InitAndPlay( request.downloadHandler.data );
+            Announcement.Instance.PlayAnnouncement( request.downloadHandler.data );
         }
     }
 
