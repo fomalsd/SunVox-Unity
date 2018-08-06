@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 using Random = UnityEngine.Random;
@@ -13,8 +14,8 @@ public enum Slot {
 public class Announcement : MonoBehaviour {
 	public static Announcement Instance;
 	public Text Text;
-	///sampler module id 5 is hardcoded for demo
-	private readonly int SamplerModule = 5;
+	///sampler module id 5 is hardcoded
+	private static readonly int SamplerModule = 5;
 
 	private int FxModule;
 
@@ -29,7 +30,6 @@ public class Announcement : MonoBehaviour {
 //		                           "Syndicate ship is approaching. " +
 //		                           "Central Command doesn't give a damn, so I guess we're on our own." );
 		FxModule = LoadFxInstrument( "keys/fm1.sunsynth" );
-//		PlayMusic( "a10.xm", 32 );
 	}
 
 	public void Init() {
@@ -56,7 +56,8 @@ public class Announcement : MonoBehaviour {
 		SunVox.sv_open_slot( (int)Slot.Announce );
 
 		log( "Loading Announce project from file..." );
-		var path = "Assets/StreamingAssets/announcement2.sunvox"; //fixme This path is correct only for editor
+//		var path = "Assets/StreamingAssets/announcement2.sunvox"; //This path is correct only for win (editor+build) and mac(editor only)
+		var path = GetDataPath("announcement2.sunvox");
 		if ( SunVox.sv_load( (int)Slot.Announce, path ) == 0 ) {
 			log( "Loaded." );
 		} else {
@@ -74,8 +75,8 @@ public class Announcement : MonoBehaviour {
 	}
 
 	public int LoadFxInstrument( string instrument ) {
-		//Load module and play it:
-		var path = $"Assets/StreamingAssets/{instrument}"; // This path is correct only for standalone
+		var path = GetDataPath(instrument);
+//		var path = $"Assets/StreamingAssets/{instrument}";
 		int moduleId = SunVox.sv_load_module( (int)Slot.FX, path, 0, 0, 0 );
 		if ( moduleId >= 0 ) {
 			log( "Module loaded: " + moduleId );
@@ -100,7 +101,8 @@ public class Announcement : MonoBehaviour {
 	}
 
 	public void PlayMusic( string filename, byte volume = Byte.MaxValue ) {
-		var path = $"Assets/StreamingAssets/{filename}"; // This path is correct only for editor
+//		var path = $"Assets/StreamingAssets/{filename}"; 
+		var path = GetDataPath(filename);
 		log( $"Loading track {filename} from {path}..." );
 		if ( SunVox.sv_load( (int)Slot.Music, path ) == 0 ) {
 			log( "Loaded." );
@@ -149,6 +151,25 @@ public class Announcement : MonoBehaviour {
 
 	private void Stop( Slot slot ) {
 		SunVox.sv_stop( (int)slot );
+	}
+
+	private string GetDataPath( string fileName ) {
+		var streamingAssetsPath = "";
+#if UNITY_IPHONE
+    streamingAssetsPath = Application.dataPath + "/Raw";
+#endif
+
+#if UNITY_ANDROID
+    streamingAssetsPath = "jar:file://" + Application.dataPath + "!/assets";
+#endif
+
+#if UNITY_STANDALONE || UNITY_EDITOR
+		streamingAssetsPath = Application.streamingAssetsPath; //fixme doesn't work for mac
+#endif
+
+		var path = Path.Combine( streamingAssetsPath, fileName );
+		log( "getDataPath: " + path );
+		return path;
 	}
 
 	private void log( string msg ) {
